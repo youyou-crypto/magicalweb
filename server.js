@@ -10,18 +10,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ====================
-// MongoDB Atlas 设置
+// MongoDB Atlas 设置（已写死：按你要求）
 // ====================
-const mongoUrl = "mongodb://youyouwodego:yesiqi521@cluster0-shard-00-00.em9snb8.mongodb.net:27017,cluster0-shard-00-01.em9snb8.mongodb.net:27017,cluster0-shard-00-02.em9snb8.mongodb.net:27017/mycollectorDB?ssl=true&replicaSet=atlas-0&authSource=admin&retryWrites=true&w=majority";
+const mongoUrl =
+  'mongodb+srv://youyouwodego:yesiqi521@cluster0.em9snb8.mongodb.net/mycollectorDB?retryWrites=true&w=majority&appName=Cluster0';
 
-// 连接 MongoDB
-mongoose.connect(mongoUrl)
-  .then(() => console.log('✅ MongoDB 连接成功'))
-  .catch(err => console.error('❌ MongoDB 连接失败:', err));
-
-// 创建 Mongoose Schema
+// ====================
+// Mongoose Schema
+// ====================
 const numberSchema = new mongoose.Schema({
-  number: String,
+  number: { type: String, required: true },
   time: { type: Date, default: Date.now }
 });
 const NumberModel = mongoose.model('Number', numberSchema);
@@ -32,27 +30,32 @@ const NumberModel = mongoose.model('Number', numberSchema);
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
-app.use(session({
-  secret: 'mySecret123',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 30 * 60 * 1000 } // 30分钟
-}));
+app.use(
+  session({
+    secret: 'mySecret123',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { maxAge: 30 * 60 * 1000 } // 30分钟
+  })
+);
 
-// 本地 JSON 文件
+// 本地 JSON 文件（注意：Render 上文件不保证持久，重启/重新部署可能丢）
 const DATA_FILE = path.join(__dirname, 'data.json');
 if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify([]));
 }
 
 // ====================
-// 接收手机号
+// 接收号码
 // ====================
 app.post('/submit', async (req, res) => {
-  const number = req.body.number;
+  const number = String(req.body.number || '').trim();
 
   if (!/^[0-9]{10,12}$/.test(number)) {
-    return res.json({ success: false, message: 'Please enter a correct and genuine phone number' });
+    return res.json({
+      success: false,
+      message: 'Please enter a correct and genuine phone number'
+    });
   }
 
   const entry = { number, time: new Date() };
@@ -69,11 +72,11 @@ app.post('/submit', async (req, res) => {
   // ===== 保存到 MongoDB =====
   try {
     await NumberModel.create(entry);
+    return res.json({ success: true });
   } catch (err) {
     console.error('❌ 数据保存到 MongoDB 失败:', err);
+    return res.json({ success: false, message: 'Database error' });
   }
-
-  res.json({ success: true });
 });
 
 // ====================
@@ -86,7 +89,7 @@ app.get('/admin', async (req, res) => {
 
   let data = [];
   try {
-    data = await NumberModel.find().sort({ time: -1 }).exec();
+    data = await NumberModel.find().sort({ time: -1 }).lean();
   } catch (err) {
     console.error('❌ MongoDB 读取数据失败:', err);
   }
@@ -94,7 +97,12 @@ app.get('/admin', async (req, res) => {
   res.send(`
     <h2>管理员后台</h2>
     <ul>
-      ${data.map(item => `<li>${item.number} - ${new Date(item.time).toLocaleString()}</li>`).join('')}
+      ${data
+        .map(
+          (item) =>
+            `<li>${item.number} - ${new Date(item.time).toLocaleString()}</li>`
+        )
+        .join('')}
     </ul>
     <a href=" ">退出登录</a >
   `);
@@ -102,9 +110,9 @@ app.get('/admin', async (req, res) => {
 
 // 登录接口
 app.post('/admin-login', (req, res) => {
-  const { password } = req.body;
+  const { password } = req.body || {};
 
-  if (password === '123456') { // 自定义密码
+  if (password === '123456') {
     req.session.isAdmin = true;
     res.json({ success: true });
   } else {
@@ -114,13 +122,28 @@ app.post('/admin-login', (req, res) => {
 
 // 退出登录
 app.get('/admin-logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/admin');
+  req.session.destroy(() => {
+    res.redirect('/admin');
+  });
 });
 
 // ====================
-// 启动服务器
+// 启动服务器：先连上 MongoDB 再 listen（避免 buffering 超时）
 // ====================
-app.listen(PORT, () => {
-  console.log(`服务器已启动：http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await mongoose.connect(mongoUrl, {
+      serverSelectionTimeoutMS: 10000
+    });
+    console.log('✅ MongoDB 连接成功');
+
+    app.listen(PORT, () => {
+      console.log(`服务器已启动：http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ MongoDB 连接失败:', err);
+    process.exit(1);
+  }
+}
+
+start();
