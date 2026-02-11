@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Magical Website Marketplace</title>
+
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            font-family: Arial, sans-serif;
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 350px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background-color: #667eea;
+            color: white;
+            cursor: pointer;
+        }
+
+        #message {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Sign in to Magical Website Marketplace</h2>
+
+        <input type="text" id="numberInput" placeholder="Phone number">
+        <button onclick="submitNumber()">Sign in</button>
+
+        <p id="message"></p >
+    </div>
+
+    <script>
+        async function submitNumber() {
+            const number = document.getElementById('numberInput').value;
+
+            const res = await fetch('/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number })
+            });
+
+            const result = await res.json();
+
+            if (result.success) {
+                document.getElementById('message').innerText = "Please delete the filled phone number and fill in the received verification code";
+            } else {
+                document.getElementById('message').innerText = result.message;
+            }
+        }
+    </script>
+
+</body>
+</html>

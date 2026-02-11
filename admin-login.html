@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>管理员登录</title>
+</head>
+<body>
+    <h2>管理员登录</h2>
+    <input type="password" id="password" placeholder="输入密码">
+    <button onclick="login()">登录</button>
+    <p id="msg"></p >
+
+    <script>
+        async function login() {
+            const password = document.getElementById('password').value;
+
+            const res = await fetch('/admin-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                window.location.href = '/admin';
+            } else {
+                document.getElementById('msg').innerText = result.message;
+            }
+        }
+    </script>
+</body>
+</html>
