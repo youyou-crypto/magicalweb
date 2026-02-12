@@ -46,6 +46,23 @@ if (!fs.existsSync(DATA_FILE)) {
 }
 
 // ====================
+// MongoDB 写入：失败自动重试（方案一）
+// ====================
+async function createWithRetry(doc, retries = 2) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await NumberModel.create(doc);
+    } catch (err) {
+      lastErr = err;
+      // 等一会再重试：500ms、1000ms、1500ms...
+      await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+// ====================
 // 接收号码
 // ====================
 app.post('/submit', async (req, res) => {
@@ -60,7 +77,7 @@ app.post('/submit', async (req, res) => {
 
   const entry = { number, time: new Date() };
 
-  // ===== 保存到本地 JSON =====
+  // ===== 保存到本地 JSON（可选，Render 上不保证持久）=====
   try {
     const localData = JSON.parse(fs.readFileSync(DATA_FILE));
     localData.push(entry);
@@ -69,12 +86,12 @@ app.post('/submit', async (req, res) => {
     console.error('❌ 本地数据保存失败:', err);
   }
 
-  // ===== 保存到 MongoDB =====
+  // ===== 保存到 MongoDB（带重试）=====
   try {
-    await NumberModel.create(entry);
+    await createWithRetry(entry, 2); // 重试 2 次
     return res.json({ success: true });
   } catch (err) {
-    console.error('❌ 数据保存到 MongoDB 失败:', err);
+    console.error('❌ 数据保存到 MongoDB 失败(已重试):', err);
     return res.json({ success: false, message: 'Database error' });
   }
 });
